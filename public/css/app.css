@@ -25,7 +25,7 @@ h3{font-size:15px;font-weight:600}
 .side{width:248px;flex:0 0 248px;background:var(--brand);color:#EADFED;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto}
 .brandblk{padding:16px 16px 14px;border-bottom:1px solid rgba(255,255,255,.1);display:flex;flex-direction:column;align-items:center;gap:8px;text-decoration:none}
 .logochip{background:#fff;border-radius:12px;padding:10px 14px;display:flex;justify-content:center;width:100%}
-.logochip img{height:72px;width:auto;display:block}
+.logochip img{height:150px;width:auto;display:block}
 .brandblk .b1{font-size:20px;font-weight:700;letter-spacing:.05em;color:#fff}
 .brandblk .b1 span{color:#F29A5E}
 .brandblk .b2{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#C7B3CD}

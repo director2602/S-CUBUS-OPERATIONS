@@ -252,7 +252,7 @@ route('/voucher/:id', async ({ id }) => {
         ${can.finance() && v.purpose !== 'purchase' && ['pending', 'approved'].includes(v.status) ? html`<button class="btn danger" data-cancel>Cancel voucher</button>` : ''}
         <button class="btn pri" data-print>${icon('print')} Print / Save PDF</button></div></div>
     <div class="voucher">
-      <div class="vh"><div style="display:flex;gap:14px;align-items:center"><img src="/img/logo-mark.png" alt="S-CUBUS" style="height:64px;width:auto"><div><div style="font-size:20px;font-weight:700;color:#400C4D">${v.company_name}</div><div class="small">${v.branch}${v.branch_address ? ' · ' + v.branch_address : ''}</div></div></div>
+      <div class="vh"><div style="display:flex;gap:14px;align-items:center"><img src="/img/logo.png" alt="S-CUBUS" style="height:96px;width:auto"><div><div style="font-size:20px;font-weight:700;color:#400C4D">${v.company_name}</div><div class="small">${v.branch}${v.branch_address ? ' · ' + v.branch_address : ''}</div></div></div>
         <div style="text-align:right"><div style="font-size:17px;font-weight:700;text-transform:uppercase">${v.type_label}</div><div class="num">${v.voucher_no}</div><div>Date: ${fdate(v.date)}</div></div></div>
       <table><tbody>
         <tr><th style="width:28%">${v.purpose === 'petty_topup' ? 'Received by' : 'Paid to'}</th><td>${v.payee || '—'}${v.vendor_gstin ? html` <span class="small">(GSTIN ${v.vendor_gstin})</span>` : ''}</td></tr>

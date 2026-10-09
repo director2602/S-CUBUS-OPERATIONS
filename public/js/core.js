@@ -222,7 +222,7 @@ function shell() {
   const initials = me.name.replace(/[^A-Za-z ]/g, '').split(/\s+/).filter(Boolean).map((x) => x[0]).slice(0, 2).join('').toUpperCase();
   document.getElementById('app').innerHTML = html`<div class="shell">
     <aside class="side" id="side">
-      <a class="brandblk" href="#/" aria-label="S-CUBUS Operations home"><span class="logochip"><img src="/img/logo-mark.png" alt="S-CUBUS"></span><span class="b2">Operations Control</span></a>
+      <a class="brandblk" href="#/" aria-label="S-CUBUS Operations home"><span class="logochip"><img src="/img/logo.png" alt="S-CUBUS"></span><span class="b2">Operations Control</span></a>
       <nav class="nav" aria-label="Main">${navFor().map((g) => html`<div class="grp">${g.grp}</div>${g.list.map(([href, ic, label]) => html`<a href="${href}" data-nav="${href}">${icon(ic)}<span>${label}</span></a>`)}`)}
         <div class="grp">Account</div><a href="#/password">${icon('key')}<span>Change password</span></a><a href="#" data-act="logout">${icon('logout')}<span>Sign out</span></a>
       </nav>
