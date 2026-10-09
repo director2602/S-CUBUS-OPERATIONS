@@ -1,0 +1,58 @@
+const express = require('express');
+const path = require('path');
+const cookieParser = require('cookie-parser');
+const compression = require('compression');
+const helmet = require('helmet');
+const { migrate } = require('./db');
+const { seedBase } = require('./seed');
+const { auth } = require('./lib');
+
+const app = express();
+app.set('trust proxy', 1);
+app.use(helmet({
+  contentSecurityPolicy: {
+    useDefaults: true,
+    directives: {
+      'script-src': ["'self'", 'https://cdnjs.cloudflare.com'],
+      'style-src': ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+      'font-src': ["'self'", 'https://fonts.gstatic.com'],
+      'img-src': ["'self'", 'data:', 'blob:'],
+      'connect-src': ["'self'"]
+    }
+  }
+}));
+app.use(compression());
+app.use(express.json({ limit: '8mb' }));
+app.use(cookieParser());
+
+app.get('/healthz', (req, res) => res.send('ok'));
+
+const masters = require('./routes/masters');
+app.use('/api', masters.publicRouter);
+app.use('/api', auth, masters.router);
+app.use('/api', auth, require('./routes/finance'));
+app.use('/api', auth, require('./routes/ops'));
+app.use('/api', auth, require('./routes/dash').router);
+app.use('/api', (req, res) => res.status(404).json({ error: 'Not found' }));
+
+app.get('/vendor/chart.umd.js', (req, res) => res.sendFile(path.join(__dirname, '..', 'node_modules', 'chart.js', 'dist', 'chart.umd.js'), { maxAge: '7d' }));
+app.get('/vendor/xlsx.full.min.js', (req, res) => res.sendFile(path.join(__dirname, '..', 'node_modules', 'xlsx', 'dist', 'xlsx.full.min.js'), { maxAge: '7d' }));
+app.use(express.static(path.join(__dirname, '..', 'public'), { maxAge: '1h', index: 'index.html' }));
+app.use((req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'index.html')));
+
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, next) => {
+  const status = err.status || 500;
+  if (status === 500) console.error(err);
+  res.status(status).json({ error: status === 500 ? 'Something went wrong on the server. Please try again.' : err.message });
+});
+
+const PORT = process.env.PORT || 3000;
+(async () => {
+  await migrate();
+  await seedBase();
+  if (process.env.SEED_DEMO === 'true') {
+    await require('./seed-demo').seedDemo();
+  }
+  app.listen(PORT, () => console.log(`S-CUBUS Operations running on :${PORT}`));
+})().catch((e) => { console.error(e); process.exit(1); });
