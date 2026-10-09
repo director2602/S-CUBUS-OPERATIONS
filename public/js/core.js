@@ -222,7 +222,7 @@ function shell() {
   const initials = me.name.replace(/[^A-Za-z ]/g, '').split(/\s+/).filter(Boolean).map((x) => x[0]).slice(0, 2).join('').toUpperCase();
   document.getElementById('app').innerHTML = html`<div class="shell">
     <aside class="side" id="side">
-      <div class="brandblk"><div class="b1">S-<span>CUBUS</span></div><div class="b2">Operations Control</div></div>
+      <a class="brandblk" href="#/" aria-label="S-CUBUS Operations home"><span class="logochip"><img src="/img/logo-mark.png" alt="S-CUBUS"></span><span class="b2">Operations Control</span></a>
       <nav class="nav" aria-label="Main">${navFor().map((g) => html`<div class="grp">${g.grp}</div>${g.list.map(([href, ic, label]) => html`<a href="${href}" data-nav="${href}">${icon(ic)}<span>${label}</span></a>`)}`)}
         <div class="grp">Account</div><a href="#/password">${icon('key')}<span>Change password</span></a><a href="#" data-act="logout">${icon('logout')}<span>Sign out</span></a>
       </nav>
@@ -281,7 +281,7 @@ export async function render() {
 export function renderLogin() {
   document.title = 'Sign in · S-CUBUS Operations';
   document.getElementById('app').innerHTML = html`<div class="login"><form class="box" id="loginf">
-    <div><div class="b1">S-<span>CUBUS</span></div><div class="muted small">Operations Control System</div></div>
+    <div class="hero"><img src="/img/logo.png" alt="S-CUBUS — NEET · IIT-JEE · Foundation"><div class="muted small">Operations Control System</div></div>
     <div class="fld"><label for="le">Email or phone</label><input id="le" name="email" type="text" autocomplete="username" required></div>
     <div class="fld"><label for="lp">Password</label><input id="lp" name="password" type="password" autocomplete="current-password" required></div>
     <button class="btn pri lg" type="submit">Sign in</button>
