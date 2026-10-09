@@ -17,6 +17,7 @@ const name = () => `${pick(FIRST)} ${pick(LAST)}`;
 const phone = () => '9' + String(ri(100000000, 999999999));
 
 async function seedDemo() {
+  const defIds = {};
   const has = await one('SELECT COUNT(*)::int AS n FROM purchases');
   const done = await one("SELECT value FROM settings WHERE key='demo_seeded'");
   if (has.n > 0 || done) return;
@@ -99,7 +100,8 @@ async function seedDemo() {
       const busy = [1, 0.75, 1.25][i] * growth * (sunday ? 0.35 : 1);
       const entry = async (key, data, hm, by, status) => {
         if (isToday && hm > nowHM()) return;
-        const def = await one('SELECT id FROM register_defs WHERE key=$1', [key]);
+        if (!defIds[key]) defIds[key] = (await one('SELECT id FROM register_defs WHERE key=$1', [key])).id;
+        const def = { id: defIds[key] };
         const st = status || (d < 55 ? pick(['verified', 'verified', 'verified', 'reviewed']) : (d < 61 ? pick(['verified', 'submitted']) : 'submitted'));
         await q(`INSERT INTO register_entries (register_id, branch_id, entry_date, data, status, created_by, created_at, verified_by, verified_at)
           VALUES ($1,$2,$3,$4,$5,$6, ($3::date + $7::time) AT TIME ZONE 'Asia/Kolkata', $8, CASE WHEN $5 IN ('verified','reviewed') THEN ($3::date + time '21:00') AT TIME ZONE 'Asia/Kolkata' END)`,
@@ -310,4 +312,22 @@ async function seedDemo() {
   } else console.log('Demo data ready. Demo logins use password Demo@123.');
 }
 
-module.exports = { seedDemo };
+// Fast path: load the pre-built demo dataset (server/demo-data.sql.gz) in one round trip into an EMPTY database.
+async function loadDemoDump() {
+  const fs = require('fs'); const path = require('path'); const zlib = require('zlib');
+  const file = path.join(__dirname, 'demo-data.sql.gz');
+  const u = await one('SELECT COUNT(*)::int AS n FROM users');
+  if (u.n > 0 || !fs.existsSync(file)) return false;
+  console.log('Loading demo dataset…');
+  const sql = zlib.gunzipSync(fs.readFileSync(file)).toString('utf8');
+  const { pool } = require('./db');
+  await pool.query('BEGIN; ' + sql + ' COMMIT;');
+  const email = process.env.OWNER_EMAIL || 'director@scubus.com';
+  const pw = process.env.OWNER_PASSWORD || 'Scubus@2026';
+  await q("UPDATE users SET email=$1, password_hash=$2, active=TRUE WHERE role='owner'", [email, await bcrypt.hash(pw, 10)]);
+  await q(`UPDATE users SET active=${process.env.DEMO_LOGINS === 'true' ? 'TRUE' : 'FALSE'} WHERE email LIKE '%@demo.scubus'`);
+  console.log('Demo dataset loaded (sample period ending 9 Oct 2026). Clear it any time from Settings.');
+  return true;
+}
+
+module.exports = { seedDemo, loadDemoDump };

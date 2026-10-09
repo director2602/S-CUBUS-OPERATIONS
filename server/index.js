@@ -50,9 +50,11 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 3000;
 (async () => {
   await migrate();
+  let loaded = false;
+  if (process.env.SEED_DEMO === 'true') loaded = await require('./seed-demo').loadDemoDump().catch((e) => { console.error('Demo dataset load failed:', e.message); return false; });
   await seedBase();
-  if (process.env.SEED_DEMO === 'true') {
-    await require('./seed-demo').seedDemo();
-  }
   app.listen(PORT, () => console.log(`S-CUBUS Operations running on :${PORT}`));
+  if (process.env.SEED_DEMO === 'true' && !loaded && process.env.SEED_DEMO_GENERATE === 'true') {
+    require('./seed-demo').seedDemo().catch((e) => console.error('Demo seed failed:', e));
+  }
 })().catch((e) => { console.error(e); process.exit(1); });

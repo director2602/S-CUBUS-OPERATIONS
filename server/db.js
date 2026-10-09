@@ -64,6 +64,12 @@ async function tx(fn) {
 
 async function migrate() {
   await pickPool();
+  // One-time wipe of this app's own tables (only when RESET_DB=wipe-all-data is set on purpose).
+  if (process.env.RESET_DB === 'wipe-all-data') {
+    const t = await pool.query("SELECT tablename FROM pg_tables WHERE schemaname = current_schema()");
+    for (const r of t.rows) await pool.query(`DROP TABLE IF EXISTS "${r.tablename}" CASCADE`);
+    console.log(`RESET_DB: dropped ${t.rows.length} tables in schema. Remove RESET_DB now.`);
+  }
   const sql = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8');
   await pool.query(sql);
 }
