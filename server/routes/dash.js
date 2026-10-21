@@ -455,6 +455,9 @@ r.get('/search', ah(async (req, res) => {
     (await q('SELECT id, title, doc_type, expires_on FROM documents WHERE title ILIKE $1 OR number ILIKE $1 OR notes ILIKE $1 LIMIT 10', [like]))
       .forEach((d) => out.push({ module: d.doc_type === 'license' ? 'Licence' : 'Document', title: d.title, sub: d.expires_on ? 'Expires ' + d.expires_on : '', link: '#/documents' }));
   }
+  (await q(`SELECT t.id, t.date, t.qty, t.issued_to, i.name AS item, i.id AS item_id, ba.name AS batch FROM module_txns t JOIN items i ON i.id=t.item_id LEFT JOIN batches ba ON ba.id=t.batch_id
+    WHERE t.status='active' AND t.kind='issue' AND (COALESCE(t.students,'') ILIKE $1 OR COALESCE(t.issued_to,'') ILIKE $1) AND ($2::int IS NULL OR t.branch_id=$2) ORDER BY t.date DESC LIMIT 15`, [like, bid]))
+    .forEach((t) => out.push({ module: 'Store issue', title: `${t.item} × ${t.qty}`, sub: `${t.date} · ${t.batch || t.issued_to || ''}`, link: `#/store/item/${t.item_id}` }));
   (await q('SELECT id, name, sku, unit FROM items WHERE name ILIKE $1 OR sku ILIKE $1 LIMIT 10', [like]))
     .forEach((i) => out.push({ module: 'Inventory', title: i.name, sub: i.sku || i.unit, link: `#/inventory?item=${i.id}` }));
   (await q(`SELECT id, title, status, due_date FROM tasks WHERE (title ILIKE $1 OR description ILIKE $1) AND ($2::int IS NULL OR branch_id=$2) AND (NOT $3 OR assigned_to=$4 OR requested_by=$4) LIMIT 10`, [like, bid, field, req.user.id]))

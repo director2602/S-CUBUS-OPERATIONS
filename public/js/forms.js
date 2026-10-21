@@ -23,7 +23,8 @@ export function renderFields(fields, data = {}, { isNew } = {}) {
     const wide = ['textarea', 'checklist', 'signature', 'multiselect'].includes(f.type);
     const sh = f.showIf ? raw(`data-showif='${esc(JSON.stringify(f.showIf))}'`) : '';
     const hide = f.showIf && !visible(f, data) ? 'hidden' : '';
-    const lab = html`<label for="${id(f.key)}">${f.label}${req}</label>`;
+    const hiLine = f.hi ? html`<span class="hi">${f.hi}</span>` : '';
+    const lab = html`<label for="${id(f.key)}" ${f.hi ? raw('data-hi="1"') : ''}>${f.label}${req}${hiLine}</label>`;
     const val = v === undefined || v === null ? '' : v;
     let input;
     switch (f.type) {

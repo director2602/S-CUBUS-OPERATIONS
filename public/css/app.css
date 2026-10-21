@@ -229,3 +229,17 @@ table.tbl{width:100%;border-collapse:collapse;font-size:14px}
 }
 
 .kind-expense [data-itemsel],.kind-expense [data-stockopt]{display:none!important}
+
+/* Hinglish help lines */
+.hi{display:block;font-size:12px;font-weight:500;color:#7A4A86;font-style:italic;letter-spacing:0;text-transform:none;line-height:1.3;margin-top:1px}
+.btn .hi{font-size:11px;color:inherit;opacity:.85;font-style:normal;margin:0}
+.btn.lg{flex-direction:column;gap:0;height:auto;min-height:52px;padding:6px 20px}
+.nav .hi{color:#CDB6D3;font-size:11px}
+.nav a.on .hi{color:var(--brand)}
+.tile .hi{color:var(--muted)} .tile.hot .hi{color:#E0CFE5}
+.kpi .l .hi{font-size:11px}
+.checklist .row > span:first-child .hi{font-size:12px}
+.chk .hi{display:inline;margin-left:6px}
+h1 .hi{font-size:14px;font-weight:500;margin-top:4px}
+.login .hi{display:none}
+.hint-toggle{font-size:12px}

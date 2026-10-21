@@ -34,7 +34,7 @@ function cleanFields(fields) {
       if (!opts.length) throw bad(`Field "${label}" needs options.`);
       out.options = opts;
     }
-    ['showIf', 'defaultNow', 'maxLength', 'default'].forEach((k) => { if (f[k] !== undefined && f[k] !== null && f[k] !== '') out[k] = f[k]; });
+    ['showIf', 'defaultNow', 'maxLength', 'default', 'hi'].forEach((k) => { if (f[k] !== undefined && f[k] !== null && f[k] !== '') out[k] = f[k]; });
     return out;
   });
 }

@@ -3,13 +3,14 @@ import { controlCentre } from './dash.js';
 import { entryTitle } from '../forms.js';
 
 // ---------------- Generic master editor ----------------
-function master(path, title, cols, fieldsHtml, { canWrite = () => can.mgmt(), note } = {}) {
+function master(path, title, cols, fieldsHtml, { canWrite = () => can.mgmt(), note, banner, filter } = {}) {
   route('/admin/' + path, async () => {
-    const rows = await api('/' + path);
+    const rows = (await api('/' + path)).filter(filter || (() => true));
     const edit = async (r) => modal(r ? 'Edit' : 'Add', fieldsHtml(r || { active: true }), {
       onMount: (ctx) => { ctx.onAction = async (a, el) => { if (a !== 'ok') return; const f = formData(el); if (r) await put(`/${path}/${r.id}`, f); else await post('/' + path, f); await loadLookups(true); toast('Saved'); return true; }; }
     });
     page(title, html`<div class="pagehead"><div><h1>${title}</h1>${note ? html`<div class="small muted">${note}</div>` : ''}</div>${canWrite() ? html`<div class="actions"><button class="btn pri" data-add>${icon('plus')} Add</button></div>` : ''}</div>
+      ${banner ? banner() : ''}
       <div class="tbl-wrap"><table class="tbl"><thead><tr>${cols.map(([, l]) => html`<th>${l}</th>`)}<th>Status</th><th></th></tr></thead><tbody>
       ${rows.map((r) => html`<tr>${cols.map(([k]) => html`<td>${r[k] ?? ''}</td>`)}<td>${r.active ? badge('approved', 'Active') : badge('cancelled', 'Inactive')}</td><td>${canWrite() ? html`<button class="btn sm" data-ed="${r.id}">${icon('edit')} Edit</button>` : ''}</td></tr>`)}</tbody></table></div>`);
     on('click', '[data-add]', async () => { if (await edit()) go(location.hash); });
@@ -20,7 +21,14 @@ const tf = (name, label, v, type = 'text') => html`<div class="fld"><label for="
 const act = (r) => html`<label class="chk"><input type="checkbox" name="active" ${r.active ? raw('checked') : ''}> Active</label>`;
 master('branches', 'Branches', [['name', 'Name'], ['code', 'Code'], ['address', 'Address']], (r) => html`<div class="form">${tf('name', 'Name *', r.name)}${tf('code', 'Code', r.code)}<div class="full">${tf('address', 'Address (printed on vouchers)', r.address)}</div>${act(r)}</div>`);
 master('items', 'Items', [['name', 'Item'], ['category', 'Category'], ['unit', 'Unit'], ['min_stock', 'Min stock / branch'], ['rate', 'Std. rate ₹']], (r) => html`<div class="form">${tf('name', 'Item name *', r.name)}${tf('sku', 'SKU / code', r.sku)}${tf('category', 'Category', r.category)}${tf('unit', 'Unit (pcs, ream, kit…)', r.unit || 'pcs')}${tf('min_stock', 'Minimum stock per branch', r.min_stock ?? 0, 'number')}${tf('rate', 'Standard rate ₹', r.rate ?? 0, 'number')}${act(r)}</div>`,
-  { canWrite: () => can.finance() || state.me.role === 'manager', note: 'Stock items (books, T-shirts, stationery…). Low-stock alerts use the minimum.' });
+  { canWrite: () => can.finance() || state.me.role === 'manager', note: 'General stock items. Modules, T-shirts / uniforms and housekeeping supplies have their own screens below.',
+    filter: (r) => !r.item_kind || r.item_kind === 'general',
+    banner: () => html`<div class="tiles">
+      <a class="tile hot" href="#/store?tab=modules"><span class="ic">${icon('file')}</span><b>Modules (books)</b><span>Course · class · subject · module no. — receive & give to batches</span></a>
+      <a class="tile" href="#/store?tab=apparel"><span class="ic">${icon('person')}</span><b>T-shirts & uniforms</b><span>Sizes · students, teachers, non-academic</span></a>
+      <a class="tile" href="#/store?tab=supplies"><span class="ic">${icon('broom')}</span><b>Housekeeping & supplies</b><span>Cleaning, stationery, pantry, electrical, first aid</span></a>
+      <a class="tile" href="#/store?tab=batches"><span class="ic">${icon('users')}</span><b>Batches</b><span>Student count per batch → pending copies</span></a></div>
+      <h2 style="margin-top:8px">General items</h2>` });
 master('categories', 'Expense categories', [['name', 'Category']], (r) => html`<div class="form">${tf('name', 'Name *', r.name)}${act(r)}</div>`, { canWrite: () => can.finance() });
 
 // ---------------- Users ----------------
@@ -122,13 +130,13 @@ const STAFF_TILES = {
   guard: [['#/registers/security/new', 'shield', 'My shift log', 'Security register', true], ['#/registers/visitor/new', 'person', 'Visitor check-in', 'Parent, student or other'], ['#/registers/visitor', 'door', 'Visitors on site', 'Check out'],
     ['#/registers/delivery/new', 'truck', 'Delivery', 'Delivery register'], ['#/registers/inward_outward/new', 'box', 'Material in / out', 'Gate pass'], ['#/registers/key/new', 'key', 'Key issue', 'Key register'],
     ['#/registers/incident/new', 'alert', 'Incident report', 'Safety & security'], ['#/registers/opening/new', 'check', 'Opening checklist', 'Morning'], ['#/registers/closing/new', 'check', 'Closing checklist', 'Night'], ['#/my-submissions', 'inbox', 'My submissions', '']],
-  office_boy: [['#/tasks', 'tasks', 'My tasks', 'Today\'s errands', true], ['#/purchase/new', 'cart', 'Purchase errand', 'Petty cash purchase'], ['#/purchases', 'receipt', 'Upload receipt', 'My purchases'],
+  office_boy: [['#/tasks', 'tasks', 'My tasks', 'Today\'s errands', true], ['#/purchase/new', 'cart', 'Purchase errand', 'Petty cash purchase'], ['#/store/entry?type=receipt', 'inbox', 'Stock received', 'Modules / T-shirts / saaman aaya'], ['#/store/entry?type=issue', 'box', 'Stock given', 'Saaman diya'], ['#/purchases', 'receipt', 'Upload receipt', 'My purchases'],
     ['#/registers/courier/new', 'truck', 'Delivery / courier', 'Courier register'], ['#/quick-issue', 'camera', 'Report issue', 'Photo first'], ['#/my-submissions', 'inbox', 'Task & register history', '']],
-  housekeeping: [['#/registers/housekeeping/new', 'broom', "Today's checklist", 'Area cleaning', true], ['#/quick-issue', 'camera', 'Report issue', 'Take a photo'], ['#/registers/lost_found/new', 'box', 'Lost & found', 'Item found'],
+  housekeeping: [['#/registers/housekeeping/new', 'broom', "Today's checklist", 'Area cleaning', true], ['#/store/entry?type=issue&kind=supply', 'box', 'Supplies used', 'Saaman liya / use kiya'], ['#/store/entry?type=receipt&kind=supply', 'inbox', 'Supplies received', 'Saaman aaya'], ['#/quick-issue', 'camera', 'Report issue', 'Take a photo'], ['#/registers/lost_found/new', 'box', 'Lost & found', 'Item found'],
     ['#/tasks', 'tasks', 'My tasks', ''], ['#/my-submissions', 'inbox', 'Completed tasks', 'My submissions']],
   driver: [['#/registers/vehicle/new', 'truck', 'Trip log', 'Vehicle register', true], ['#/tasks', 'tasks', 'My tasks', ''], ['#/purchase/new', 'cart', 'Fuel / expense', 'Petty cash'], ['#/quick-issue', 'camera', 'Report issue', ''], ['#/my-submissions', 'inbox', 'My submissions', '']],
   maintenance: [['#/registers/maintenance', 'alert', 'Open issues', 'Maintenance register', true], ['#/quick-issue', 'camera', 'Report issue', ''], ['#/tasks', 'tasks', 'My tasks', ''], ['#/purchase/new', 'cart', 'Buy parts', 'Petty cash'], ['#/my-submissions', 'inbox', 'My submissions', '']],
-  staff: [['#/registers/visitor/new', 'person', 'Visitor check-in', '', true], ['#/registers/courier/new', 'truck', 'Courier', ''], ['#/registers/reception/new', 'clip', 'Reception summary', 'End of day'], ['#/registers/lost_found/new', 'box', 'Lost & found', ''],
+  staff: [['#/registers/visitor/new', 'person', 'Visitor check-in', '', true], ['#/store/entry?type=issue&kind=module', 'file', 'Give modules', 'Batch / student ko module'], ['#/store/entry?type=receipt', 'inbox', 'Receive stock', 'Modules / T-shirts aaye'], ['#/registers/courier/new', 'truck', 'Courier', ''], ['#/registers/reception/new', 'clip', 'Reception summary', 'End of day'], ['#/registers/lost_found/new', 'box', 'Lost & found', ''],
     ['#/tasks', 'tasks', 'Tasks', ''], ['#/purchase/new', 'cart', 'Purchase / expense', ''], ['#/quick-issue', 'camera', 'Report issue', ''], ['#/registers', 'clip', 'All registers', '']]
 };
 route('/', async (p, query) => {

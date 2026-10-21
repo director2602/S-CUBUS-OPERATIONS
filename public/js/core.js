@@ -1,3 +1,4 @@
+import { hinglishOn, setHinglish, watchHinglish } from './hinglish.js';
 // Core helpers: html templating, API, router, layout, UI primitives, charts.
 class Raw { constructor(s) { this.s = s; } toString() { return this.s; } }
 export const raw = (s) => new Raw(s);
@@ -202,7 +203,8 @@ function navFor() {
   const items = [];
   const add = (grp, list) => items.push({ grp, list });
   if (can.field() || r === 'staff') {
-    add('My work', [['#/', 'home', 'Home'], ['#/my-submissions', 'inbox', 'My submissions'], ['#/tasks', 'tasks', 'My tasks'], ['#/purchase/new', 'cart', 'Purchase / errand'], ['#/purchases', 'receipt', 'My purchases'], ['#/quick-issue', 'alert', 'Report issue']]);
+    add('My work', [['#/', 'home', 'Home'], ['#/my-submissions', 'inbox', 'My submissions'], ['#/tasks', 'tasks', 'My tasks'], ['#/purchase/new', 'cart', 'Purchase / errand'], ['#/purchases', 'receipt', 'My purchases'], ['#/quick-issue', 'alert', 'Report issue'],
+      ...(['guard', 'driver'].includes(r) ? [] : [['#/store?tab=' + (r === 'staff' ? 'modules' : 'supplies'), 'box', 'Store']])]);
     add('Registers', [['#/registers', 'clip', 'All registers']]);
     return items;
   }
@@ -211,7 +213,7 @@ function navFor() {
   add('Registers & Logs', [['#/registers-centre', 'clip', 'Registers Centre'], ['#/registers', 'inbox', 'All registers'], ['#/review', 'check', 'Review & verify'],
     ...(can.mgmt() ? [['#/register-builder', 'plus', 'Register Builder']] : [])]);
   add('Money', [['#/approvals', 'check', 'Approvals'], ['#/purchases', 'cart', 'Purchases & expenses'], ['#/vouchers', 'receipt', 'Vouchers'], ['#/petty-cash', 'wallet', 'Petty cash'], ['#/vendors', 'users', 'Vendors']]);
-  add('Operations', [['#/inventory', 'box', 'Inventory'], ['#/tasks', 'tasks', 'Tasks'], ['#/documents', 'file', 'Documents & compliance'], ['#/reports', 'chart', 'Report Builder']]);
+  add('Operations', [['#/store', 'layers', 'Modules, uniforms & supplies'], ['#/inventory', 'box', 'Inventory'], ['#/tasks', 'tasks', 'Tasks'], ['#/documents', 'file', 'Documents & compliance'], ['#/reports', 'chart', 'Report Builder']]);
   if (can.mgmt()) add('Admin', [['#/admin/users', 'users', 'Users & roles'], ['#/admin/branches', 'home', 'Branches'], ['#/admin/items', 'box', 'Items'], ['#/admin/categories', 'layers', 'Expense categories'], ['#/settings', 'cog', 'Settings']]);
   else if (r === 'accounts' || r === 'manager') add('Masters', [['#/admin/items', 'box', 'Items']]);
   return items;
@@ -231,6 +233,7 @@ function shell() {
       <header class="top">
         <button type="button" class="btn sm menu-btn" data-act="menu" aria-label="Open menu">${icon('menu')}</button>
         <form class="search" role="search" data-form="gsearch"><label for="gs" class="sr">Search all registers and records</label>${icon('search')}<input id="gs" type="search" placeholder="Search everything — vehicle no., name, voucher, item…" autocomplete="off"></form>
+        <button type="button" class="btn sm hint-toggle" data-act="hinglish" title="Show / hide Hinglish help lines">${hinglishOn() ? 'Hinglish: ON' : 'Hinglish: OFF'}</button>
         <div class="who"><div class="nm" style="text-align:right"><div style="font-weight:600">${me.name}</div><div class="muted tiny">${state.roles[me.role]}${me.branch_name ? ' · ' + me.branch_name : ''}</div></div><div class="av">${initials}</div></div>
       </header>
       <main class="content" id="content" tabindex="-1"></main>
@@ -241,6 +244,8 @@ function shell() {
 document.addEventListener('click', async (ev) => {
   const a = ev.target.closest('[data-act="logout"]');
   if (a) { ev.preventDefault(); await post('/auth/logout'); state.me = null; location.hash = '#/'; renderLogin(); }
+  const hb = ev.target.closest('[data-act="hinglish"]');
+  if (hb) { setHinglish(!hinglishOn()); shell(); render(); return; }
   const m = ev.target.closest('[data-act="menu"]');
   if (m) document.getElementById('side').classList.toggle('open');
   if (ev.target.closest('.nav a')) { const s = document.getElementById('side'); if (s) s.classList.remove('open'); }
@@ -301,6 +306,7 @@ export async function boot() {
   } catch (e) { return; }
   await loadLookups(true);
   shell();
+  watchHinglish();
   render();
 }
 window.addEventListener('hashchange', () => { if (state.me) render(); });

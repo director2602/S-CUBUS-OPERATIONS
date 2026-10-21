@@ -268,3 +268,68 @@ CREATE INDEX IF NOT EXISTS idx_purchases_date ON purchases(date, branch_id);
 CREATE INDEX IF NOT EXISTS idx_stock_mv_created ON stock_movements(created_at, branch_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_completed ON tasks(completed_at);
 CREATE INDEX IF NOT EXISTS idx_vouchers_status ON vouchers(status, branch_id);
+
+-- ---------- Modules (study books distributed to students) ----------
+ALTER TABLE items ADD COLUMN IF NOT EXISTS is_module BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE items ADD COLUMN IF NOT EXISTS course TEXT;
+ALTER TABLE items ADD COLUMN IF NOT EXISTS class_level TEXT;
+ALTER TABLE items ADD COLUMN IF NOT EXISTS subject TEXT;
+ALTER TABLE items ADD COLUMN IF NOT EXISTS module_no TEXT;
+ALTER TABLE items ADD COLUMN IF NOT EXISTS session TEXT;
+ALTER TABLE items ADD COLUMN IF NOT EXISTS language TEXT;
+ALTER TABLE items ADD COLUMN IF NOT EXISTS edition TEXT;
+ALTER TABLE items ADD COLUMN IF NOT EXISTS title TEXT;
+CREATE INDEX IF NOT EXISTS idx_items_module ON items(is_module, course, class_level, subject);
+
+CREATE TABLE IF NOT EXISTS batches (
+  id SERIAL PRIMARY KEY,
+  branch_id INT NOT NULL REFERENCES branches(id),
+  name TEXT NOT NULL,
+  course TEXT NOT NULL,
+  class_level TEXT,
+  session TEXT,
+  language TEXT,
+  students INT NOT NULL DEFAULT 0,
+  active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS module_txns (
+  id SERIAL PRIMARY KEY,
+  kind TEXT NOT NULL,             -- receipt, distribution, transfer, damaged, return
+  item_id INT NOT NULL REFERENCES items(id),
+  branch_id INT NOT NULL REFERENCES branches(id),
+  to_branch_id INT REFERENCES branches(id),
+  batch_id INT REFERENCES batches(id),
+  date DATE NOT NULL DEFAULT CURRENT_DATE,
+  qty NUMERIC NOT NULL,
+  damaged_qty NUMERIC NOT NULL DEFAULT 0,
+  source TEXT,
+  source_name TEXT,
+  challan_no TEXT,
+  received_by TEXT,
+  students TEXT,
+  remarks TEXT,
+  file_id INT REFERENCES files(id),
+  status TEXT NOT NULL DEFAULT 'active',   -- active, cancelled
+  cancel_reason TEXT,
+  created_by INT REFERENCES users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_by INT REFERENCES users(id),
+  updated_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_module_txns_item ON module_txns(item_id, branch_id, kind);
+
+-- ---------- T-shirts & uniforms (apparel) ----------
+ALTER TABLE items ADD COLUMN IF NOT EXISTS item_kind TEXT NOT NULL DEFAULT 'general';   -- general, module, apparel
+ALTER TABLE items ADD COLUMN IF NOT EXISTS garment TEXT;
+ALTER TABLE items ADD COLUMN IF NOT EXISTS size TEXT;
+ALTER TABLE items ADD COLUMN IF NOT EXISTS audience TEXT;     -- Students, Teachers, Non-academic staff
+ALTER TABLE items ADD COLUMN IF NOT EXISTS gender TEXT;
+ALTER TABLE items ADD COLUMN IF NOT EXISTS colour TEXT;
+UPDATE items SET item_kind='module' WHERE is_module AND item_kind='general';
+ALTER TABLE module_txns ADD COLUMN IF NOT EXISTS issued_to TEXT;
+ALTER TABLE module_txns ADD COLUMN IF NOT EXISTS issued_to_type TEXT;   -- batch, student, staff
+CREATE INDEX IF NOT EXISTS idx_items_kind ON items(item_kind);
+ALTER TABLE items ADD COLUMN IF NOT EXISTS spec TEXT;
+ALTER TABLE module_txns ADD COLUMN IF NOT EXISTS department TEXT;

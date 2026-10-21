@@ -181,6 +181,7 @@ route('/register-builder/:id', async ({ id }) => {
     <span title="Drag to reorder" style="cursor:grab;font-size:18px;color:var(--faint);align-self:center" aria-hidden="true">⋮⋮</span>
     <div class="fld"><label for="fl${i}">Field label</label><input id="fl${i}" type="text" data-k="label" value="${f.label}"></div>
     <div class="fld"><label for="ft${i}">Type</label><select id="ft${i}" data-k="type">${opts(Object.entries(TYPES).map(([k, v]) => ({ id: k, name: v })), f.type)}</select></div>
+    <div class="fld" style="grid-column:2/4"><label for="fh${i}">Hinglish help (optional)</label><input id="fh${i}" type="text" data-k="hi" value="${f.hi || ''}" placeholder="e.g. Kaunsi jagah saaf ki"></div>
     <div class="fld ${['select', 'multiselect', 'checklist'].includes(f.type) ? '' : 'hidden'}" data-optw><label for="fo${i}">Options (comma separated)</label><input id="fo${i}" type="text" data-k="options" value="${f.options}"></div>
     <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;${['select', 'multiselect', 'checklist'].includes(f.type) ? '' : 'grid-column:4/6'}">
       <label class="chk"><input type="checkbox" data-k="required" ${f.required ? raw('checked') : ''}> Required</label>
