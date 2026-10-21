@@ -38,12 +38,20 @@ app.use('/api', (req, res) => res.status(404).json({ error: 'Not found' }));
 
 app.get('/vendor/chart.umd.js', (req, res) => res.sendFile(path.join(__dirname, '..', 'node_modules', 'chart.js', 'dist', 'chart.umd.js'), { maxAge: '7d' }));
 app.get('/vendor/xlsx.full.min.js', (req, res) => res.sendFile(path.join(__dirname, '..', 'node_modules', 'xlsx', 'dist', 'xlsx.full.min.js'), { maxAge: '7d' }));
+// Each release gets its own URL prefix for scripts/styles, so browsers can never run an old cached copy.
+const fs = require('fs');
+const BUILD = (process.env.RENDER_GIT_COMMIT || String(Date.now())).slice(0, 10);
+const PUB = path.join(__dirname, '..', 'public');
+const indexHtml = () => fs.readFileSync(path.join(PUB, 'index.html'), 'utf8').replace(/(["'])\/(js|css)\//g, `$1/r/${BUILD}/$2/`);
+app.use('/r/:build', express.static(PUB, { maxAge: '30d', immutable: true, index: false }));
+const sendIndex = (req, res) => { res.setHeader('Cache-Control', 'no-cache'); res.type('html').send(indexHtml()); };
+app.get(['/', '/index.html'], sendIndex);
 // Always re-check app files with the server (cheap 304 when unchanged) so new releases show up immediately.
 app.use(express.static(path.join(__dirname, '..', 'public'), {
   index: 'index.html',
   setHeaders: (res, file) => { res.setHeader('Cache-Control', /\.(png|svg|ico)$/.test(file) ? 'public, max-age=86400' : 'no-cache'); }
 }));
-app.use((req, res) => { res.setHeader('Cache-Control', 'no-cache'); res.sendFile(path.join(__dirname, '..', 'public', 'index.html')); });
+app.use(sendIndex);
 
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
