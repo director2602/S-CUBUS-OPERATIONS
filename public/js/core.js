@@ -180,6 +180,73 @@ export function spark(id, data, color = '#400C4D') {
 }
 export const moneyTick = { callback: (v) => inrShort(v) };
 
+// ---------- Excel downloads ----------
+const cleanText = (el) => { if (!el) return ''; const c = el.cloneNode(true); c.querySelectorAll('.hi, button, .btn, input, select').forEach((x) => x.remove()); return c.textContent.replace(/\s+/g, ' ').trim(); };
+function sheetNamer() {
+  const used = new Set();
+  return (t) => { const b = String(t || 'Sheet').replace(/[\\/?*\[\]:]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 28) || 'Sheet'; let nm = b; let i = 2; while (used.has(nm.toLowerCase())) { nm = b.slice(0, 25) + ' ' + i; i += 1; } used.add(nm.toLowerCase()); return nm; };
+}
+const fileSafe = (t) => String(t || 'export').replace(/[^A-Za-z0-9 _&-]+/g, ' ').replace(/\s+/g, '-').replace(/^-|-$/g, '').toLowerCase();
+export function exportPageExcel() {
+  const X = window.XLSX; if (!X) return toast('Excel library is still loading — try again in a moment.', true);
+  const root = document.getElementById('content'); const wb = X.utils.book_new(); const nm = sheetNamer();
+  const title = cleanText(root.querySelector('h1')) || document.title.split(' · ')[0];
+  const kpis = [...root.querySelectorAll('.kpi')].map((k) => ({ Measure: cleanText(k.querySelector('.l')), Value: cleanText(k.querySelector('.v')), Note: cleanText(k.querySelector('.n')) })).filter((r) => r.Measure || r.Value);
+  if (kpis.length) X.utils.book_append_sheet(wb, X.utils.json_to_sheet(kpis), nm('Summary'));
+  const tables = root.querySelectorAll('table');
+  tables.forEach((t, i) => {
+    const holder = t.closest('.card, section, .voucher'); const h = holder && holder.querySelector('h2, h3, .eyebrow');
+    const c = t.cloneNode(true); c.querySelectorAll('.hi, button, .btn, input, select').forEach((x) => x.remove());
+    X.utils.book_append_sheet(wb, X.utils.table_to_sheet(c, { raw: true }), nm(h ? cleanText(h) : (tables.length > 1 ? `${title} ${i + 1}` : title)));
+  });
+  root.querySelectorAll('dl.kv').forEach((dl) => {
+    const holder = dl.closest('.card'); const h = holder && holder.querySelector('h2, h3');
+    const rows = [...dl.querySelectorAll('dt')].map((dt) => ({ Field: cleanText(dt), Value: cleanText(dt.nextElementSibling) }));
+    if (rows.length) X.utils.book_append_sheet(wb, X.utils.json_to_sheet(rows), nm(h ? cleanText(h) : 'Details'));
+  });
+  root.querySelectorAll('ul.att').forEach((ul) => {
+    const holder = ul.closest('.card'); const h = holder && holder.querySelector('h2, h3');
+    const rows = [...ul.querySelectorAll(':scope > li')].map((li) => ({ Item: cleanText(li) })).filter((r) => r.Item);
+    if (rows.length) X.utils.book_append_sheet(wb, X.utils.json_to_sheet(rows), nm(h ? cleanText(h) : 'List'));
+  });
+  root.querySelectorAll('.ins').forEach((box) => {
+    const rows = []; box.querySelectorAll('.eyebrow').forEach((e) => { const sec = e.parentElement; sec.querySelectorAll('p, li').forEach((x) => rows.push({ Section: cleanText(e), Text: cleanText(x) })); });
+    if (rows.length) X.utils.book_append_sheet(wb, X.utils.json_to_sheet(rows), nm('Management summary'));
+  });
+  if (!wb.SheetNames.length) return toast('Nothing to download on this page.', true);
+  X.writeFile(wb, `${fileSafe(title)}-${todayStr()}.xlsx`);
+  toast('Excel downloaded');
+}
+export async function downloadEverything(btn) {
+  const X = window.XLSX; if (!X) return toast('Excel library is still loading — try again in a moment.', true);
+  if (btn) { btn.disabled = true; btn.dataset.label = btn.textContent; btn.textContent = 'Preparing… / taiyaar ho raha hai'; }
+  try {
+    const d = await api('/export/all');
+    const wb = X.utils.book_new(); const nm = sheetNamer();
+    const info = Object.entries(d.sheets).map(([k, rows]) => ({ Sheet: k, Rows: rows.length }));
+    X.utils.book_append_sheet(wb, X.utils.json_to_sheet([{ Sheet: 'S-CUBUS Operations — full data download', Rows: '' }, { Sheet: 'Generated', Rows: fdt(d.generated_at) }, ...info]), nm('Contents'));
+    Object.entries(d.sheets).forEach(([k, rows]) => { X.utils.book_append_sheet(wb, rows.length ? X.utils.json_to_sheet(rows) : X.utils.aoa_to_sheet([['No records yet']]), nm(k)); });
+    X.writeFile(wb, `scubus-operations-all-data-${todayStr()}.xlsx`);
+    toast('Full data downloaded');
+  } catch (e) { err(e); } finally { if (btn) { btn.disabled = false; btn.textContent = btn.dataset.label; } }
+}
+document.addEventListener('click', (ev) => {
+  if (ev.target.closest('[data-xlpage]')) exportPageExcel();
+  const all = ev.target.closest('[data-xlall]'); if (all) downloadEverything(all);
+});
+function addExcelButton() {
+  const root = document.getElementById('content');
+  if (!root || root.querySelector('[data-xlpage]')) return;
+  if (!root.querySelector('table, .kpi, dl.kv, ul.att')) return;
+  const ph = root.querySelector('.pagehead');
+  if (!ph) return;
+  let act = ph.querySelector(':scope > .actions');
+  if (!act) { act = document.createElement('div'); act.className = 'actions'; ph.appendChild(act); }
+  const b = document.createElement('button'); b.type = 'button'; b.className = 'btn'; b.dataset.xlpage = '1'; b.title = 'Download everything on this screen as an Excel file';
+  b.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M4 21h16"/></svg> Excel';
+  act.insertBefore(b, act.firstChild);
+}
+
 // ---------- Router & layout ----------
 const routes = [];
 export function route(pattern, handler, opts = {}) { routes.push({ re: new RegExp('^' + pattern.replace(/:(\w+)/g, '(?<$1>[^/]+)') + '$'), handler, opts }); }
@@ -276,6 +343,7 @@ export async function render() {
     const m = r.re.exec(path);
     if (m) {
       try { await r.handler(m.groups || {}, query); } catch (e) { if (e.stale) return; page('Error', html`<div class="callout crit">${e.message}</div>`); }
+      addExcelButton();
       window.scrollTo(0, 0);
       return;
     }

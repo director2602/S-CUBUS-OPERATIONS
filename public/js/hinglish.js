@@ -16,7 +16,7 @@ export const HI = {
   'submit issue': 'Shikayat bhejiye', 'take photo': 'Photo kheenchiye', 'take / choose photo': 'Photo kheenchiye ya chuniye', 'speak': 'Bol kar likhiye',
   'mark all completed': 'Sab ho gaya', 'now': 'Abhi ka samay', 'clear': 'Mitaiye', 'check out': 'Bahar jaane ka samay', 'done': 'Ho gaya', 'start': 'Shuru kiya',
   'submit & create voucher': 'Jama karein — voucher banega', 'receive stock': 'Saaman aaya — darj karein', 'issue / give out': 'Saaman diya — darj karein',
-  'filter': 'Chhaantiye', 'add': 'Jodiye', 'edit': 'Badliye', 'new entry': 'Nayi entry', 'check in visitor': 'Mehmaan andar aaye',
+  'filter': 'Chhaantiye', 'excel': 'Excel mein download', 'download everything (excel)': 'Saara data Excel mein', 'add': 'Jodiye', 'edit': 'Badliye', 'new entry': 'Nayi entry', 'check in visitor': 'Mehmaan andar aaye',
   // ---- registers: housekeeping ----
   'area': 'Kaunsi jagah saaf ki', 'cleaning time': 'Safai ka samay', 'checklist': 'Kya kya kiya, tick kijiye', 'issue found': 'Koi kharabi mili? Likhiye',
   'floor cleaned': 'Farsh saaf kiya', 'dustbins emptied': 'Dustbin khaali kiye', 'washrooms cleaned': 'Washroom saaf kiye', 'water available': 'Paani hai',

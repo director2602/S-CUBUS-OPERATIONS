@@ -54,7 +54,7 @@ export async function controlCentre(query) {
   const days = s.map((x) => fdateShort(x.d));
   page('Control Centre', html`
     <div class="pagehead"><div><div class="eyebrow">${fdate(d.date)} · ${query.branch_id ? state.lookups.branches.find((b) => String(b.id) === query.branch_id)?.name : (can.allBranches() ? 'All branches' : state.me.branch_name)}</div><h1>${state.me.role === 'manager' ? 'Branch Dashboard' : 'Management Control Centre'}</h1></div>
-      <div class="actions">${branchPicker(query)}<a class="btn" href="#/digest">${icon('star')} Daily Digest</a><a class="btn pri" href="#/purchase/new">${icon('plus')} New purchase</a></div></div>
+      <div class="actions">${branchPicker(query)}${can.finance() ? html`<button class="btn" type="button" data-xlall>⬇ All data (Excel)</button>` : ''}<a class="btn" href="#/digest">${icon('star')} Daily Digest</a><a class="btn pri" href="#/purchase/new">${icon('plus')} New purchase</a></div></div>
     ${n.incidents_critical_open ? html`<div class="callout crit"><b>${n.incidents_critical_open} critical incident(s) open.</b> <a href="#/registers/incident">Review now</a></div>` : ''}
     <section aria-label="Today"><div class="eyebrow" style="margin-bottom:8px">Today</div><div class="kpis">${tiles.map(([l, v, nn, sp, href, warn], i) => html`<a class="kpi" href="${href}"><span class="l">${l}</span><span class="v">${v}</span><span class="n ${warn ? 'warn' : ''}">${nn}</span><div style="height:34px"><canvas id="sp${i}" aria-hidden="true"></canvas></div></a>`)}</div></section>
     <div class="grid g2">

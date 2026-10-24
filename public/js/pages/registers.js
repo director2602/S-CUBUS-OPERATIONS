@@ -1,4 +1,4 @@
-import { html, raw, api, post, put, route, page, state, can, inr, fdate, fdt, ftime, badge, icon, on, go, toast, err, modal, promptReason, confirmBox, opts, formData, todayStr, addDays, cap } from '../core.js';
+import { html, raw, api, post, put, route, page, state, can, chart, PALETTE, inr, fdate, fdt, ftime, badge, icon, on, go, toast, err, modal, promptReason, confirmBox, opts, formData, todayStr, addDays, cap } from '../core.js';
 import { renderFields, setupFields, collectFields, finalizeSignatures, showValue, entryTitle, uploadFile, voice } from '../forms.js';
 
 let DEFS = null;
@@ -23,21 +23,40 @@ route('/registers', async () => {
 route('/registers/:key', async ({ key }, query) => {
   const def = (await defs()).find((d) => d.key === key) || await api('/registers/' + key);
   const from = query.from || addDays(todayStr(), key === 'maintenance' || key === 'incident' || key === 'lost_found' ? -60 : -6); const to = query.to || todayStr();
-  const qs = new URLSearchParams({ register: key, from, to, ...(query.status ? { status: query.status } : {}), ...(query.q ? { q: query.q } : {}), ...(query.branch_id ? { branch_id: query.branch_id } : {}), limit: 1000 });
+  const fieldFilters = Object.fromEntries(Object.entries(query).filter(([k, v]) => /^f_/.test(k) && v));
+  const qs = new URLSearchParams({ register: key, from, to, ...(query.status ? { status: query.status } : {}), ...(query.q ? { q: query.q } : {}), ...(query.branch_id ? { branch_id: query.branch_id } : {}),
+    ...(query.enquiry ? { enquiry: 1 } : {}), ...fieldFilters, limit: 3000 });
   const rows = await api('/entries?' + qs);
-  const cols = def.fields.filter((f) => !['file', 'image', 'signature', 'textarea', 'checklist'].includes(f.type) && !f.showIf).slice(0, 6);
+  const VIS_COLS = ['visitor_type', 'visitor_name', 'student_name', 'phone', 'purpose', 'purpose_details', 'person_to_meet', 'exit_time'];
+  const cols = key === 'visitor'
+    ? VIS_COLS.map((k) => def.fields.find((f) => f.key === k)).filter(Boolean)
+    : def.fields.filter((f) => !['file', 'image', 'signature', 'textarea', 'checklist'].includes(f.type) && !f.showIf).slice(0, 6);
+  const selFields = def.fields.filter((f) => f.type === 'select' || f.type === 'yesno').slice(0, 6);
+  // Admission enquiries for the same period / branch (independent of other filters)
+  const enq = key === 'visitor' ? await api('/entries?' + new URLSearchParams({ register: 'visitor', from, to, enquiry: 1, ...(query.branch_id ? { branch_id: query.branch_id } : {}), limit: 3000 })) : [];
+  const rangeLink = (f, t) => { const qq = new URLSearchParams({ ...query, from: f, to: t }); return `#/registers/${key}?${qq}`; };
+  const t0 = todayStr(); const monthStart = t0.slice(0, 8) + '01';
   const checkout = { visitor: 'exit_time', key: 'returned_at', equipment_handover: 'return_time' }[key];
   const onSite = key === 'visitor' ? rows.filter((r) => r.entry_date === todayStr() && !r.data.exit_time) : [];
   page(def.name, html`<div class="pagehead"><div><div class="eyebrow">${def.department || ''} · ${FREQ[def.frequency]}${def.deadline ? ' · deadline ' + def.deadline : ''}</div><h1>${def.name}</h1></div>
     <div class="actions"><button class="btn" data-xl>Export Excel</button>${can.mgmt() ? html`<a class="btn" href="#/register-builder/${def.id}">${icon('edit')} Edit fields</a>` : ''}<a class="btn pri" href="#/registers/${key}/new">${icon('plus')} ${key === 'visitor' ? 'Check in visitor' : 'New entry'}</a></div></div>
-    ${key === 'visitor' ? html`<div class="kpis"><div class="kpi"><span class="l">On site now</span><span class="v">${onSite.length}</span></div><div class="kpi"><span class="l">Today</span><span class="v">${rows.filter((r) => r.entry_date === todayStr()).length}</span></div>
-      <div class="kpi"><span class="l">Parents · Students · Others (period)</span><span class="v" style="font-size:20px">${rows.filter((r) => r.data.visitor_type === 'Parent').length} · ${rows.filter((r) => r.data.visitor_type === 'Student').length} · ${rows.filter((r) => !['Parent', 'Student'].includes(r.data.visitor_type)).length}</span></div></div>` : ''}
+    ${key === 'visitor' ? html`<div class="kpis"><div class="kpi"><span class="l">On site now</span><span class="v">${onSite.length}</span></div><div class="kpi"><span class="l">Visitors today</span><span class="v">${rows.filter((r) => r.entry_date === todayStr()).length}</span></div>
+      <div class="kpi"><span class="l">Parents · Students · Others (shown)</span><span class="v" style="font-size:20px">${rows.filter((r) => r.data.visitor_type === 'Parent').length} · ${rows.filter((r) => r.data.visitor_type === 'Student').length} · ${rows.filter((r) => !['Parent', 'Student'].includes(r.data.visitor_type)).length}</span></div>
+      <a class="kpi" href="${`#/registers/visitor?${new URLSearchParams({ from, to, enquiry: 1, ...(query.branch_id ? { branch_id: query.branch_id } : {}) })}`}" style="border-color:var(--brand)"><span class="l">Admission enquiries (${fdate(from)} – ${fdate(to)})</span><span class="v" style="color:var(--brand)">${enq.length}</span>
+        <span class="n">${enq.filter((r) => r.data.visitor_type === 'Parent').length} parents · ${enq.filter((r) => r.data.visitor_type === 'Student').length} students · ${enq.filter((r) => !['Parent', 'Student'].includes(r.data.visitor_type)).length} others — click to list</span></a></div>
+      ${enq.length ? html`<div class="card"><div class="card-h"><h2>Admission enquiries per day</h2><span class="small muted">Visitors whose purpose is admission enquiry (or mentions admission)</span></div><div class="chart-box sm"><canvas id="cEnq" role="img" aria-label="Admission enquiries per day"></canvas></div></div>` : ''}` : ''}
+    <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center"><span class="small muted">Quick dates:</span>
+      <a class="btn sm" href="${rangeLink(t0, t0)}">Today</a><a class="btn sm" href="${rangeLink(addDays(t0, -6), t0)}">Last 7 days</a><a class="btn sm" href="${rangeLink(monthStart, t0)}">This month</a><a class="btn sm" href="${rangeLink(addDays(t0, -29), t0)}">Last 30 days</a><a class="btn sm" href="${rangeLink(addDays(t0, -364), t0)}">Last 1 year</a>
+      ${key === 'visitor' ? html`<a class="btn sm ${query.enquiry ? 'pri' : ''}" href="#/registers/visitor?${new URLSearchParams({ ...Object.fromEntries(Object.entries(query).filter(([k]) => k !== 'enquiry')), ...(query.enquiry ? {} : { enquiry: 1 }) })}">${query.enquiry ? '✓ Admission enquiries only' : 'Show admission enquiries only'}</a>` : ''}</div>
     <form class="filters card tight" data-form="flt">
+      ${query.enquiry ? html`<input type="hidden" name="enquiry" value="1">` : ''}
       <div class="fld"><label for="eq">Search</label><input id="eq" type="search" name="q" value="${query.q || ''}" placeholder="Name, number, vehicle…"></div>
       <div class="fld"><label for="ef">From</label><input id="ef" type="date" name="from" value="${from}"></div><div class="fld"><label for="et">To</label><input id="et" type="date" name="to" value="${to}"></div>
+      ${selFields.map((f) => html`<div class="fld"><label for="ff_${f.key}">${f.label}</label><select id="ff_${f.key}" name="f_${f.key}">${opts(f.type === 'yesno' ? ['Yes', 'No'] : f.options, query['f_' + f.key], { blank: 'All' })}</select></div>`)}
       <div class="fld"><label for="es">Status</label><select id="es" name="status">${opts(['submitted', 'reviewed', 'verified', 'returned'], query.status, { blank: 'All' })}</select></div>
       ${can.allBranches() ? html`<div class="fld"><label for="eb">Branch</label><select id="eb" name="branch_id">${opts(state.lookups.branches, query.branch_id, { blank: 'All' })}</select></div>` : ''}
-      <button class="btn" type="submit">Filter</button></form>
+      <button class="btn" type="submit">Filter</button><a class="btn" href="#/registers/${key}">Reset</a></form>
+    <div class="small muted">${rows.length} ${rows.length === 1 ? 'entry' : 'entries'} shown${query.enquiry ? ' · admission enquiries only' : ''}${Object.keys(fieldFilters).length ? ' · filtered' : ''}. “Export Excel” downloads exactly these entries with every field.</div>
     <div class="tbl-wrap"><table class="tbl" id="etbl"><thead><tr><th>Date</th>${cols.map((c) => html`<th>${c.label}</th>`)}${can.allBranches() ? html`<th>Branch</th>` : ''}<th>By</th><th>Status</th>${checkout ? html`<th></th>` : ''}</tr></thead><tbody>
       ${rows.length ? rows.map((r) => html`<tr class="click" data-href="#/entry/${r.id}"><td style="white-space:nowrap">${fdate(r.entry_date)}<div class="tiny muted">${ftime(r.created_at)}</div></td>${cols.map((c) => html`<td>${showValue(c, r.data[c.key])}</td>`)}${can.allBranches() ? html`<td>${r.branch}</td>` : ''}<td class="small">${r.created_by_name}${r.edits ? html`<div class="tiny" style="color:var(--high)">edited ${r.edits}×</div>` : ''}</td><td>${badge(r.status)}</td>
         ${checkout ? html`<td>${!r.data[checkout] ? html`<button class="btn sm pri" data-co="${r.id}">${key === 'visitor' ? 'Check out' : 'Mark returned'}</button>` : ''}</td>` : ''}</tr>`) : html`<tr><td colspan="${cols.length + 5}" class="empty">No entries in this period.</td></tr>`}
@@ -47,8 +66,16 @@ route('/registers/:key', async ({ key }, query) => {
   on('click', '[data-co]', async (b) => { b.disabled = true; await post(`/entries/${b.dataset.co}/checkout`); toast(key === 'visitor' ? 'Checked out' : 'Marked returned'); go(location.hash); });
   on('click', '[data-xl]', () => {
     const data = rows.map((r) => ({ Date: r.entry_date, Branch: r.branch, ...Object.fromEntries(def.fields.filter((f) => !['file', 'image', 'signature'].includes(f.type)).map((f) => [f.label, f.type === 'checklist' ? Object.entries(r.data[f.key] || {}).map(([k, v]) => `${k}: ${v.status}${v.remark ? ' (' + v.remark + ')' : ''}`).join('; ') : (Array.isArray(r.data[f.key]) ? r.data[f.key].join(', ') : r.data[f.key] ?? '')])), 'Entered by': r.created_by_name, Status: r.status }));
-    const ws = window.XLSX.utils.json_to_sheet(data); const wb = window.XLSX.utils.book_new(); window.XLSX.utils.book_append_sheet(wb, ws, def.name.slice(0, 30)); window.XLSX.writeFile(wb, `${key}-${from}-to-${to}.xlsx`);
+    const ws = window.XLSX.utils.json_to_sheet(data); const wb = window.XLSX.utils.book_new(); window.XLSX.utils.book_append_sheet(wb, ws, (query.enquiry ? 'Admission enquiries' : def.name).slice(0, 30)); window.XLSX.writeFile(wb, `${query.enquiry ? 'admission-enquiries' : key}-${from}-to-${to}.xlsx`);
   });
+  if (key === 'visitor' && enq.length) {
+    const days = []; for (let d = from; d <= to && days.length < 400; d = addDays(d, 1)) days.push(d);
+    chart('cEnq', { type: 'bar', data: { labels: days.map((d) => d.slice(8, 10) + '/' + d.slice(5, 7)), datasets: [
+      { label: 'Parents', data: days.map((d) => enq.filter((r) => r.entry_date === d && r.data.visitor_type === 'Parent').length), backgroundColor: PALETTE[0], borderRadius: 2 },
+      { label: 'Students', data: days.map((d) => enq.filter((r) => r.entry_date === d && r.data.visitor_type === 'Student').length), backgroundColor: PALETTE[2], borderRadius: 2 },
+      { label: 'Others', data: days.map((d) => enq.filter((r) => r.entry_date === d && !['Parent', 'Student'].includes(r.data.visitor_type)).length), backgroundColor: PALETTE[4], borderRadius: 2 }] },
+    options: { plugins: { legend: { position: 'bottom' } }, scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } } } } });
+  }
 });
 
 // ---------------- Entry form (new & edit) ----------------

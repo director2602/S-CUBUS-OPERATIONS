@@ -55,6 +55,9 @@ route('/admin/users', async () => {
 route('/settings', async () => {
   const s = await api('/settings');
   page('Settings', html`<div class="pagehead"><h1>Settings</h1></div>
+    <div class="card" style="max-width:760px;display:flex;flex-direction:column;gap:8px"><h2>Download all data</h2>
+      <p class="small muted" style="margin:0">One Excel file with a separate sheet for every area: all registers (each field as a column), purchases, purchase lines, vouchers, petty cash book, stock, stock movements, store entries, batches, tasks, documents, vendors, users and the audit trail. Downloading does not change any data.</p>
+      <div><button class="btn pri" type="button" data-xlall>⬇ Download everything (Excel)</button></div></div>
     <form id="sf" class="card" style="display:flex;flex-direction:column;gap:14px;max-width:760px">
       <div class="form">${tf('company_name', 'Company name (printed on vouchers)', s.company_name)}${tf('manager_approval_limit', 'Branch manager approval limit ₹', s.manager_approval_limit, 'number')}${tf('petty_cash_default_float', 'Petty cash float per branch ₹', s.petty_cash_default_float, 'number')}</div>
       <div class="small muted">Purchases above the manager limit need Owner, Admin or Accounts approval. Register deadlines are set per register in the Register Builder.</div>
@@ -85,7 +88,8 @@ route('/reports', async (p, query) => {
   const mods = await api('/reports/modules');
   const sel = query.module || 'purchases';
   const m = mods[sel] || mods.purchases;
-  page('Report Builder', html`<div class="pagehead"><div><h1>Custom Report Builder</h1><div class="small muted">Pick a module, dates, branch, columns and filters. Export to Excel or PDF.</div></div></div>
+  page('Report Builder', html`<div class="pagehead"><div><h1>Custom Report Builder</h1><div class="small muted">Pick a module, dates, branch, columns and filters. Export to Excel or PDF.</div></div>
+    ${can.finance() ? html`<div class="actions"><button class="btn pri" type="button" data-xlall>⬇ Download everything (Excel)</button></div>` : ''}</div>
     <form id="rbf" class="card" style="display:flex;flex-direction:column;gap:14px">
       <div class="form">
         <div class="fld"><label for="rm">Module</label><select id="rm" name="module">${opts(Object.entries(mods).map(([id, x]) => ({ id, name: x.name })), sel)}</select></div>

@@ -132,6 +132,13 @@ r.get('/entries', ah(async (req, res) => {
   if (req.query.mine || FIELD_ROLES.includes(req.user.role)) { p.push(req.user.id); where += ` AND e.created_by=$${p.length}`; }
   if (req.query.open_visitors) where += " AND d.key='visitor' AND COALESCE(e.data->>'exit_time','')=''";
   if (req.query.q) { p.push('%' + req.query.q + '%'); where += ` AND e.data::text ILIKE $${p.length}`; }
+  // Field filters: f_<fieldkey>=value matches the stored answer exactly (e.g. f_purpose=Admission enquiry)
+  Object.keys(req.query).filter((k) => /^f_[a-z0-9_]{1,40}$/.test(k) && req.query[k] !== '').forEach((k) => {
+    p.push(k.slice(2)); p.push(String(req.query[k]));
+    where += ` AND e.data->>$${p.length - 1} = $${p.length}`;
+  });
+  // Any admission-related visit (purpose or details mention admission / enquiry)
+  if (req.query.enquiry) where += " AND (COALESCE(e.data->>'purpose','') ILIKE '%admission%' OR COALESCE(e.data->>'purpose_details','') ILIKE '%admission%')";
   res.json(await q(`SELECT e.*, d.key AS register_key, d.name AS register_name, b.name AS branch, u.name AS created_by_name, vu.name AS verified_by_name,
       (SELECT COUNT(*)::int FROM register_history hh WHERE hh.entry_id=e.id) AS edits
     FROM register_entries e JOIN register_defs d ON d.id=e.register_id LEFT JOIN branches b ON b.id=e.branch_id
