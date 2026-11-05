@@ -366,3 +366,5 @@ r.put('/documents/:id', ah(async (req, res) => {
 }));
 
 module.exports = r;
+module.exports.validateData = validateData;
+module.exports.syncInventory = syncInventory;

@@ -200,9 +200,11 @@ r.put('/store/items/:id', ah(async (req, res) => {
 // ---------- transactions ----------
 function canTransact(u) { return u && !['guard', 'driver'].includes(u.role); }
 
-r.post('/store/txns', ah(async (req, res) => {
+// Shared by the screen and by Excel/CSV upload
+async function createStoreTxn(user, body) {
+  const req = { user };
   if (!canTransact(req.user)) throw forbidden();
-  const b = req.body || {};
+  const b = body || {};
   const kind = b.kind;
   if (!TXN_KINDS.includes(kind)) throw bad('Invalid entry type.');
   const itemKind = KINDS.includes(b.item_kind) ? b.item_kind : 'module';
@@ -227,11 +229,12 @@ r.post('/store/txns', ah(async (req, res) => {
       clean(b.challan_no) || null, clean(b.received_by) || null, clean(b.students) || null, clean(b.remarks) || null, b.file_id || null, clean(b.issued_to) || null,
       clean(b.issued_to_type) || null, clean(b.department) || null, req.user.id]);
     await syncStock(h, t, req.user);
-    await audit(h, 'store_txn', t.id, 'created', req.user.id, { kind, item: it.name, qty });
+    await audit(h, 'store_txn', t.id, 'created', req.user.id, { kind, item: it.name, qty, via: b._via || 'screen' });
     return t.id;
   });
-  res.json({ id });
-}));
+  return id;
+}
+r.post('/store/txns', ah(async (req, res) => { res.json({ id: await createStoreTxn(req.user, req.body || {}) }); }));
 
 r.get('/store/txns', ah(async (req, res) => {
   const bid = scopeBranch(req, req.query.branch_id);
@@ -360,3 +363,5 @@ r.get('/store/summary', ah(async (req, res) => {
 }));
 
 module.exports = r;
+module.exports.createStoreTxn = createStoreTxn;
+module.exports.storeConfig = config;

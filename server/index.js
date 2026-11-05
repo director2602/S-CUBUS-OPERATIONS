@@ -34,6 +34,7 @@ app.use('/api', auth, require('./routes/finance'));
 app.use('/api', auth, require('./routes/ops'));
 app.use('/api', auth, require('./routes/store'));
 app.use('/api', auth, require('./routes/export'));
+app.use('/api', auth, require('./routes/import'));
 app.use('/api', auth, require('./routes/dash').router);
 app.use('/api', (req, res) => res.status(404).json({ error: 'Not found' }));
 

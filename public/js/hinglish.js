@@ -11,6 +11,10 @@ export const HI = {
   'reason for editing': 'Badlav ka kaaran likhiye', 'title': 'Naam / shirshak', 'due date': 'Kab tak karna hai', 'assign to': 'Kisko dena hai',
   'task': 'Kaam', 'what\'s wrong?': 'Kya kharab hai? Bol kar ya likh kar batayein', 'what was bought / service': 'Kya khareeda',
   'email or phone': 'Email ya phone number', 'password': 'Password', 'sign in': 'Login karein',
+  // ---- upload ----
+  'upload excel / csv': 'Excel / CSV file se data jodiye', 'upload': 'File daaliye', 'template': 'Khaali format', 'upload history': 'Pehle ke uploads',
+  'rows read': 'Kitni line padhi', 'ready to add': 'Jodne ke liye taiyaar', 'added': 'Jod diya', 'skipped (already there)': 'Pehle se hai — chhod diya', 'need fixing': 'Galti theek karni hai',
+  'what are you uploading?': 'Kya upload kar rahe hain?',
   // ---- buttons ----
   'submit': 'Jama karein', 'save': 'Save karein', 'save changes': 'Badlav save karein', 'cancel': 'Radd karein', 'save & add another': 'Save karke ek aur bharein',
   'submit issue': 'Shikayat bhejiye', 'take photo': 'Photo kheenchiye', 'take / choose photo': 'Photo kheenchiye ya chuniye', 'speak': 'Bol kar likhiye',

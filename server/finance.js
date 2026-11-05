@@ -37,7 +37,7 @@ function validateModeDetails(mode, d) {
   return clean;
 }
 
-function computeLines(lines) {
+function computeLines(lines, allowNegative = false) {
   if (!Array.isArray(lines) || !lines.length) throw bad('Add at least one line.');
   let subtotal = 0; let gst = 0;
   const out = lines.map((l) => {
@@ -45,7 +45,7 @@ function computeLines(lines) {
     const rate = Number(l.rate) || 0;
     const gstRate = Number(l.gst_rate) || 0;
     if (qty <= 0) throw bad('Each line needs a quantity above zero.');
-    if (rate < 0) throw bad('Rate cannot be negative.');
+    if (rate < 0 && !(allowNegative && l.allow_negative && !l.item_id)) throw bad('Rate cannot be negative.'); // negative only for round-off / TDS / discount lines from bill uploads
     if (!l.item_id && !(l.description || '').trim()) throw bad('Each line needs an item or a description.');
     const amount = Math.round(qty * rate * 100) / 100;
     const g = Math.round(amount * gstRate) / 100;
@@ -53,6 +53,7 @@ function computeLines(lines) {
     return { item_id: l.item_id ? Number(l.item_id) : null, description: (l.description || '').trim(), qty, unit: l.unit || null, rate, gst_rate: gstRate, amount };
   });
   subtotal = Math.round(subtotal * 100) / 100; gst = Math.round(gst * 100) / 100;
+  if (subtotal + gst <= 0) throw bad('The total must be above zero.');
   return { lines: out, subtotal, gst, total: Math.round((subtotal + gst) * 100) / 100 };
 }
 
@@ -83,8 +84,8 @@ async function stockOf(h, itemId, branchId) {
 }
 
 // ---------- Purchases ----------
-async function createPurchase(user, body, branchId) {
-  const { lines, subtotal, gst, total } = computeLines(body.lines);
+async function createPurchase(user, body, branchId, opts = {}) {
+  const { lines, subtotal, gst, total } = computeLines(body.lines, !!opts.fromUpload);
   const mode = body.payment_mode;
   const details = validateModeDetails(mode, body.mode_details);
   if (!branchId) throw bad('Choose a branch.');

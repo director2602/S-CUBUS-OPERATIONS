@@ -333,3 +333,19 @@ ALTER TABLE module_txns ADD COLUMN IF NOT EXISTS issued_to_type TEXT;   -- batch
 CREATE INDEX IF NOT EXISTS idx_items_kind ON items(item_kind);
 ALTER TABLE items ADD COLUMN IF NOT EXISTS spec TEXT;
 ALTER TABLE module_txns ADD COLUMN IF NOT EXISTS department TEXT;
+
+-- ---------- Excel / CSV upload history (add-only imports) ----------
+CREATE TABLE IF NOT EXISTS import_log (
+  id SERIAL PRIMARY KEY,
+  kind TEXT NOT NULL,
+  label TEXT,
+  filename TEXT,
+  rows_total INT NOT NULL DEFAULT 0,
+  rows_imported INT NOT NULL DEFAULT 0,
+  rows_skipped INT NOT NULL DEFAULT 0,
+  rows_failed INT NOT NULL DEFAULT 0,
+  created_ids JSONB NOT NULL DEFAULT '[]',
+  errors JSONB NOT NULL DEFAULT '[]',
+  created_by INT REFERENCES users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);

@@ -249,6 +249,7 @@ function addExcelButton() {
 
 // ---------- Router & layout ----------
 const routes = [];
+export const afterRender = [];
 export function route(pattern, handler, opts = {}) { routes.push({ re: new RegExp('^' + pattern.replace(/:(\w+)/g, '(?<$1>[^/]+)') + '$'), handler, opts }); }
 export function go(hash) { if (location.hash === hash) render(); else location.hash = hash; }
 export function parseHash() {
@@ -270,7 +271,7 @@ function navFor() {
   const items = [];
   const add = (grp, list) => items.push({ grp, list });
   if (can.field() || r === 'staff') {
-    add('My work', [['#/', 'home', 'Home'], ['#/my-submissions', 'inbox', 'My submissions'], ['#/tasks', 'tasks', 'My tasks'], ['#/purchase/new', 'cart', 'Purchase / errand'], ['#/purchases', 'receipt', 'My purchases'], ['#/quick-issue', 'alert', 'Report issue'],
+    add('My work', [['#/', 'home', 'Home'], ['#/my-submissions', 'inbox', 'My submissions'], ['#/tasks', 'tasks', 'My tasks'], ['#/purchase/new', 'cart', 'Purchase / errand'], ['#/purchases', 'receipt', 'My purchases'], ['#/quick-issue', 'alert', 'Report issue'], ['#/import', 'file', 'Upload Excel / CSV'],
       ...(['guard', 'driver'].includes(r) ? [] : [['#/store?tab=' + (r === 'staff' ? 'modules' : 'supplies'), 'box', 'Store']])]);
     add('Registers', [['#/registers', 'clip', 'All registers']]);
     return items;
@@ -280,7 +281,7 @@ function navFor() {
   add('Registers & Logs', [['#/registers-centre', 'clip', 'Registers Centre'], ['#/registers', 'inbox', 'All registers'], ['#/review', 'check', 'Review & verify'],
     ...(can.mgmt() ? [['#/register-builder', 'plus', 'Register Builder']] : [])]);
   add('Money', [['#/approvals', 'check', 'Approvals'], ['#/purchases', 'cart', 'Purchases & expenses'], ['#/vouchers', 'receipt', 'Vouchers'], ['#/petty-cash', 'wallet', 'Petty cash'], ['#/vendors', 'users', 'Vendors']]);
-  add('Operations', [['#/store', 'layers', 'Modules, uniforms & supplies'], ['#/inventory', 'box', 'Inventory'], ['#/tasks', 'tasks', 'Tasks'], ['#/documents', 'file', 'Documents & compliance'], ['#/reports', 'chart', 'Report Builder']]);
+  add('Operations', [['#/store', 'layers', 'Modules, uniforms & supplies'], ['#/inventory', 'box', 'Inventory'], ['#/tasks', 'tasks', 'Tasks'], ['#/documents', 'file', 'Documents & compliance'], ['#/reports', 'chart', 'Report Builder'], ['#/import', 'file', 'Upload Excel / CSV']]);
   if (can.mgmt()) add('Admin', [['#/admin/users', 'users', 'Users & roles'], ['#/admin/branches', 'home', 'Branches'], ['#/admin/items', 'box', 'Items'], ['#/admin/categories', 'layers', 'Expense categories'], ['#/settings', 'cog', 'Settings']]);
   else if (r === 'accounts' || r === 'manager') add('Masters', [['#/admin/items', 'box', 'Items']]);
   return items;
@@ -344,6 +345,7 @@ export async function render() {
     if (m) {
       try { await r.handler(m.groups || {}, query); } catch (e) { if (e.stale) return; page('Error', html`<div class="callout crit">${e.message}</div>`); }
       addExcelButton();
+      afterRender.forEach((f) => { try { Promise.resolve(f(path, query)).catch(() => {}); } catch (e) { /* ignore */ } });
       window.scrollTo(0, 0);
       return;
     }
