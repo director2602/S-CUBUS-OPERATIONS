@@ -60,40 +60,13 @@ document.addEventListener('click', (ev) => {
 
 // ---------- template ----------
 async function downloadTemplate(kind) {
-  const X = window.XLSX; if (!X) return toast('Excel library is still loading — try again in a moment.', true);
-  const k = (await kinds()).find((x) => x.kind === kind); if (!k) return toast('Upload type not found.', true);
-  const wb = X.utils.book_new();
-  const head = k.columns.map((c) => c.label + (c.required ? ' *' : ''));
-  const ws = X.utils.aoa_to_sheet([head]);
-  ws['!cols'] = k.columns.map((c) => ({ wch: Math.max(12, Math.min(34, c.label.length + 4)) }));
-  ws['!freeze'] = { xSplit: 0, ySplit: 1 };
-  X.utils.book_append_sheet(wb, ws, 'Data');
-  const help = k.columns.map((c) => ({
-    Column: c.label, 'Required?': c.required ? 'YES (zaroori)' : 'optional',
-    'How to fill / kaise bharein': c.help || '',
-    'Allowed values': c.options ? c.options.join(', ') : (c.checklistItems ? 'Checklist items: ' + c.checklistItems.join(', ') : ''),
-    Example: c.example || ''
-  }));
-  const hs = X.utils.json_to_sheet(help);
-  hs['!cols'] = [{ wch: 26 }, { wch: 14 }, { wch: 60 }, { wch: 70 }, { wch: 24 }];
-  X.utils.book_append_sheet(wb, hs, 'Help');
-  const notes = [
-    ['S-CUBUS Operations — upload template: ' + k.label],
-    [''],
-    ['1. Fill one record per row in the "Data" sheet. Keep the first row (headings) as it is.'],
-    ['   Har line mein ek record bhariye. Pehli line (headings) mat badliye.'],
-    ['2. Columns marked * are required. See the "Help" sheet for allowed values and examples.'],
-    ['   * wale column zaroori hain. Sahi values "Help" sheet mein dekhiye.'],
-    ['3. Dates: DD/MM/YYYY (24/10/2026). Times: 14:30 or 2:30 PM.'],
-    ['4. Uploads only ADD new records. Existing data is never changed or deleted; exact repeats are skipped.'],
-    ['   Upload sirf naya data jodta hai — purana data kabhi nahi badalta.'],
-    ['5. You can also save this sheet as CSV and upload the CSV.'],
-    ['6. Before anything is saved you will see a preview with any mistakes, row by row.']
-  ];
-  const ns = X.utils.aoa_to_sheet(notes); ns['!cols'] = [{ wch: 110 }];
-  X.utils.book_append_sheet(wb, ns, 'Read me');
-  X.writeFile(wb, `template-${fileSafe(k.label)}.xlsx`);
-  toast('Template downloaded — fill the Data sheet and upload it');
+  const r = await fetch('/api/import/template/' + encodeURIComponent(kind), { credentials: 'same-origin' });
+  if (!r.ok) { let m = 'Could not make the template.'; try { m = (await r.json()).error || m; } catch (e) { /* ignore */ } throw new Error(m); }
+  const blob = await r.blob();
+  const name = ((r.headers.get('Content-Disposition') || '').match(/filename="([^"]+)"/) || [])[1] || 'template.xlsx';
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+  toast('Template downloaded — fill it and upload it');
 }
 
 // ---------- file parsing ----------
@@ -118,7 +91,7 @@ async function readFile(file) {
     let text = new TextDecoder('utf-8').decode(buf).replace(/^﻿/, '');
     wb = X.read(text, { type: 'string', raw: true });
   } else wb = X.read(buf, { type: 'array', cellDates: true });
-  const name = wb.SheetNames.find((n) => n.toLowerCase() === 'data') || wb.SheetNames.find((n) => !/^(help|read me)$/i.test(n)) || wb.SheetNames[0];
+  const name = wb.SheetNames.find((n) => ['data', 'bills'].includes(n.toLowerCase())) || wb.SheetNames.find((n) => !/^(help|read me)$/i.test(n)) || wb.SheetNames[0];
   const ws = wb.Sheets[name];
   const json = X.utils.sheet_to_json(ws, { defval: '', raw: true });
   const rows = json.map((r) => {

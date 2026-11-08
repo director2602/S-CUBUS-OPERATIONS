@@ -7,6 +7,8 @@ const { ah, bad, forbidden, isMgmt, isFinance, isReviewer, seesAll, FIELD_ROLES,
 const F = require('../finance');
 const ops = require('./ops');
 const store = require('./store');
+const ExcelJS = require('exceljs');
+const ZOHO_BILL = require('../zoho-bill-headers.json');
 
 const r = express.Router();
 const MAX_ROWS = 2000;
@@ -150,7 +152,7 @@ async function registerKinds() {
       kind: `register:${def.key}`, group: 'Registers', label: def.name,
       can: () => true,
       columns: [C('entry_date', 'Date', { type: 'date', help: 'Register date, DD/MM/YYYY. Blank = date of the first date-time field, else today.', example: '24/10/2026' }), BRANCH,
-        ...fields.map((f) => C(f.key, f.label, { required: !!f.required && !f.showIf, options: f.type === 'checklist' ? null : f.options, help: help(f) + (f.showIf ? ` (only when ${f.showIf.field.replace(/_/g, ' ')} is ${f.showIf.equals || (f.showIf.in || []).join('/')})` : '') + (f.options && f.type !== 'checklist' ? '' : ''),
+        ...fields.map((f) => C(f.key, f.label, { type: f.type, required: !!f.required && !f.showIf, options: f.type === 'checklist' ? null : f.options, help: help(f) + (f.showIf ? ` (only when ${f.showIf.field.replace(/_/g, ' ')} is ${f.showIf.equals || (f.showIf.in || []).join('/')})` : '') + (f.options && f.type !== 'checklist' ? '' : ''),
           checklistItems: f.type === 'checklist' ? f.options : undefined, example: f.options && f.type === 'select' ? f.options[0] : (f.type === 'datetime' ? '24/10/2026 10:30' : f.type === 'date' ? '24/10/2026' : f.type === 'time' ? '10:30' : f.type === 'checklist' ? 'All done' : f.type === 'yesno' ? 'Yes' : f.type === 'number' || f.type === 'currency' ? '1' : f.type === 'phone' ? '9811122233' : '') }))],
       async validate(get, ctx) {
         const branch_id = branchFrom(ctx, get('branch'));
@@ -323,6 +325,7 @@ function masterKinds() {
         C('payment_mode', 'Payment Mode', { aliases: ['Payment mode'], help: 'Petty cash, Cash, UPI, Bank transfer, Cheque, Card or Credit. Blank = Credit (vendor bill); paid part from Bill Status / Balance is recorded as a bank payment', example: '' }),
         C('reference', 'Payment Reference', { aliases: ['UPI / UTR reference', 'Reference'], example: '' }), C('cheque_no', 'Cheque Number', { aliases: ['Cheque no'] }), C('bank', 'Bank'), C('card_last4', 'Card last 4'),
         C('approve_now', 'Approve Now', { aliases: ['Approve now'], help: 'Yes / No (only within your approval limit). Blank = Yes when Bill Status is filled, else No', example: 'Yes' })],
+      sheetName: 'Bills', templateHeaders: () => ZOHO_BILL, ignoreHeaders: ZOHO_BILL,
       groupKey: (n) => (n.bill_id ? `id|${n.bill_id}` : n.bill_no ? `${n.date}|${n.branch_id}|${norm(n.vendor_name)}|${norm(n.bill_no)}|${n.payment_mode}` : null),
       async validate(get, ctx) {
         const n = { date: parseDate(get('date'), 'Bill Date'), branch_id: branchFrom(ctx, get('branch')) };
@@ -571,7 +574,8 @@ r.post('/import/:kind', ah(async (req, res) => {
   def.columns.forEach((c) => { const want = [c.label, c.key, ...(c.aliases || [])].map(norm); const h = headers.find((x) => want.includes(norm(x))); if (h) hmap[c.key] = h; });
   const missingRequired = def.columns.filter((c) => c.required && !hmap[c.key]).map((c) => c.label);
   if (missingRequired.length) throw bad(`Column(s) missing in the file: ${missingRequired.join(', ')}. Download the template to see the right headings.`);
-  const unknown = headers.filter((h) => !Object.values(hmap).includes(h) && !/^__/.test(h));
+  const ignore = new Set((def.ignoreHeaders || []).map(norm));
+  const unknown = headers.filter((h) => !Object.values(hmap).includes(h) && !/^__/.test(h) && !ignore.has(norm(h)));
   const offset = Number(b.row_offset) || 0;
   const results = [];
   const okRows = [];
@@ -621,6 +625,54 @@ r.post('/import/:kind', ah(async (req, res) => {
     }
   }
   res.json({ kind: def.kind, label: def.label, dry_run: dry, summary, results, unknown_columns: unknown, log_id: logId });
+}));
+
+// Template in the same layout as the Zoho Books "Bills" export: one header row, bold on light blue, 19.5-wide columns, yyyy-MM-dd dates.
+r.get('/import/template/:kind', ah(async (req, res) => {
+  const def = (await allKinds()).find((k) => k.kind === req.params.kind);
+  if (!def) throw bad('Unknown upload type.');
+  if (!def.can(req.user)) throw forbidden('You do not have permission to upload this.');
+  const ctx = await loadCtx(req.user);
+  const byNorm = new Map(); def.columns.forEach((c) => [c.label, ...(c.aliases || [])].forEach((a) => byNorm.set(norm(a), c)));
+  let heads = def.templateHeaders ? [...def.templateHeaders()] : def.columns.map((c) => c.label);
+  const covered = new Set(heads.map((h) => byNorm.get(norm(h))).filter(Boolean).map((c) => c.key));
+  def.columns.forEach((c) => { if (!covered.has(c.key)) heads.push(c.label); });
+  const wb = new ExcelJS.Workbook(); wb.creator = 'S-CUBUS Operations';
+  const ws = wb.addWorksheet(def.sheetName || 'Data', { views: [{ state: 'frozen', ySplit: 1 }] });
+  ws.columns = heads.map((h) => ({ header: h, width: 19.53125 }));
+  const hr = ws.getRow(1);
+  hr.eachCell((cell, i) => {
+    cell.font = { bold: true }; cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE9F0FE' } };
+    const c = byNorm.get(norm(heads[i - 1]));
+    if (c && (c.required || c.help)) cell.note = `${c.required ? 'REQUIRED (zaroori). ' : ''}${c.help || ''}${c.example ? ' e.g. ' + c.example : ''}`.trim();
+    if (c && c.type === 'date') { ws.getColumn(i).numFmt = 'yyyy-MM-dd'; for (let rr = 2; rr <= 500; rr += 1) ws.getCell(rr, i).numFmt = 'yyyy-MM-dd'; }
+    if (c && c.required) cell.font = { bold: true, color: { argb: 'FF400C4D' } };
+  });
+  // Help sheet
+  const help = wb.addWorksheet('Help');
+  help.columns = [{ header: 'Column', width: 34 }, { header: 'Required?', width: 14 }, { header: 'How to fill / kaise bharein', width: 70 }, { header: 'Allowed values', width: 60 }, { header: 'Example', width: 24 }];
+  def.columns.forEach((c) => {
+    let allowed = c.options ? c.options.join(', ') : (c.checklistItems ? 'Checklist items: ' + c.checklistItems.join(', ') : '');
+    if (c.key === 'branch') allowed = ctx.branches.map((b) => b.name).join(', ');
+    help.addRow([c.label + ((c.aliases || []).length ? ` (also: ${c.aliases.join(', ')})` : ''), c.required ? 'YES' : 'optional', c.help || '', allowed, c.example || '']);
+  });
+  if (def.ignoreHeaders) help.addRow(['All other Zoho Books columns', 'optional', 'Kept for the same layout as the Zoho Books Bills export — they are read but not needed.', '', '']);
+  help.getRow(1).eachCell((cell) => { cell.font = { bold: true }; cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE9F0FE' } }; });
+  help.eachRow((row) => row.eachCell((cell) => { cell.alignment = { wrapText: true, vertical: 'top' }; }));
+  const rm = wb.addWorksheet('Read me'); rm.getColumn(1).width = 120;
+  [`S-CUBUS Operations — upload template: ${def.label}`, '',
+    `1. Fill one record per row in the "${def.sheetName || 'Data'}" sheet. Keep the first row (headings) as it is. / Har line mein ek record bhariye, pehli line mat badliye.`,
+    '2. Headings in purple are required. Hover a heading to see how to fill it; the Help sheet lists allowed values.',
+    '3. Dates: 2026-01-13 or 13/01/2026. Times: 14:30 or 2:30 PM.',
+    ...(def.kind === 'purchases' ? ['4. A Zoho Books → Purchases → Bills → Export (XLSX) file can be uploaded as it is. Rows with the same Bill ID become one purchase with several lines.',
+      '   Paid / Overdue status and Balance are used to record what is already paid. Void and Draft bills are skipped. New vendors and expense heads are added automatically.'] : []),
+    'Uploads only ADD new records. Existing data is never changed or deleted; exact repeats are skipped. / Upload sirf naya data jodta hai — purana data nahi badlega.',
+    'You will see a row-by-row preview with any mistakes before anything is saved.'].forEach((t, i) => { const c = rm.getCell(i + 1, 1); c.value = t; if (i === 0) c.font = { bold: true, size: 13 }; });
+  const buf = await wb.xlsx.writeBuffer();
+  const fname = `template-${def.label.replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '').toLowerCase().slice(0, 60)}.xlsx`;
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', `attachment; filename="${fname}"`);
+  res.send(Buffer.from(buf));
 }));
 
 module.exports = r;
